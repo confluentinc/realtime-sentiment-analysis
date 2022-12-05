@@ -1,0 +1,158 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Real time Sentiment blog
+#Parameters
+Parameters:
+  BucketName:
+    Type: String
+    Description: The bucket name where the source code zip is present
+  KafkaInputTopic:
+    Type: String
+    Description: Input topic name
+    Default: raw.tweets
+  KafkaOutputTopic:
+    Type: String
+    Description: Output topic name
+    Default: processed.tweets
+  BootstrapServers:
+    Type: String
+    Description: Confluent bootstrap servers to be used in Flink
+  ConfluentAPIKey:
+    Type: String
+    Description: Confluent API Key 
+  ConfluentAPISecret:
+    Type: String
+    Description: Confluent API Secret
+# Resources
+Resources:
+
+
+# KDA Resources
+  KDAFlinkLogGroup:
+    Type: AWS::Logs::LogGroup
+
+  KDAFlinkLogStream:
+    Type: AWS::Logs::LogStream
+    Properties:
+      LogGroupName: !Ref KDAFlinkLogGroup
+# KDA Role
+  KinesisAnalyticsRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - kinesisanalytics.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      Path: "/"
+      Policies:
+        - PolicyName: KinesisAnalyticsRolePolicy
+          PolicyDocument:
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:GetObjectVersion
+                Resource:
+                  - !Sub "arn:aws:s3:::${BucketName}/RealTimeSentiment.zip"
+              - Effect: Allow
+                Action:
+                  - comprehend:DetectSentiment
+                  - comprehend:DetectDominantLanguage
+                Resource: "*"
+              - Effect: Allow
+                Action:
+                  - s3:PutObject
+                  - s3:GetObject
+                  - s3:DeleteObject
+                  - s3:ListBucket
+                Resource:
+                  - !Sub "arn:aws:s3:::${BucketName}"
+                  - !Sub "arn:aws:s3:::${BucketName}/*"
+              - Effect: Allow
+                Action:
+                  - logs:DescribeLogGroups
+                Resource:
+                  - !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:*"
+              - Effect: Allow
+                Action:
+                  - logs:DescribeLogStreams
+                Resource:
+                  - !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:${KDAFlinkLogGroup}:log-stream:*"
+              - Effect: Allow
+                Action:
+                  - logs:PutLogEvents
+                Resource:
+                  - !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:${KDAFlinkLogGroup}:log-stream:${KDAFlinkLogStream}"
+              - Effect: Allow
+                Action:
+                  - "ec2:DescribeVpcs"
+                  - "ec2:DescribeSubnets"
+                  - "ec2:DescribeSecurityGroups"
+                  - "ec2:DescribeDhcpOptions"
+                  - "ec2:CreateNetworkInterface"
+                  - "ec2:CreateNetworkInterfacePermission"
+                  - "ec2:DescribeNetworkInterfaces"
+                  - "ec2:DeleteNetworkInterface"
+                Resource: "*"
+
+#KDA Flink Application
+  KDAFlinkApplication:
+    Type: AWS::KinesisAnalyticsV2::Application
+    Properties:
+      RuntimeEnvironment: FLINK-1_13
+      ServiceExecutionRole: !GetAtt KinesisAnalyticsRole.Arn
+      ApplicationName: !Sub "${AWS::StackName}-kda-app"
+      ApplicationConfiguration:
+        ApplicationCodeConfiguration:
+          CodeContent:
+            S3ContentLocation:
+              BucketARN: !Sub "arn:aws:s3:::${BucketName}"
+              FileKey: "RealTimeSentiment.zip"
+          CodeContentType: ZIPFILE
+        ApplicationSnapshotConfiguration:
+          SnapshotsEnabled: true
+        FlinkApplicationConfiguration:
+          MonitoringConfiguration: 
+            ConfigurationType: CUSTOM
+            LogLevel: INFO
+            MetricsLevel: TASK
+          ParallelismConfiguration:
+            AutoScalingEnabled: true
+            ConfigurationType: CUSTOM
+            Parallelism: 12
+            ParallelismPerKPU: 1
+        EnvironmentProperties:
+          PropertyGroups:
+            - PropertyGroupId: kinesis.analytics.flink.run.options
+              PropertyMap:
+                python: "RealTimeSentiment/main.py"
+                jarfile: "RealTimeSentiment/lib/SASLLoginFatJar-0.1.jar"
+            - PropertyGroupId: producer.config.0
+              PropertyMap:
+                input.topic.name:
+                  Ref: KafkaInputTopic
+                aws.region: !Sub "${AWS::Region}"
+                bootstrap.servers: !Ref BootstrapServers
+                api.key: !Ref ConfluentAPIKey
+                api.secret: !Ref ConfluentAPISecret 
+            - PropertyGroupId: consumer.config.0
+              PropertyMap:
+                output.topic.name:
+                  Ref: KafkaOutputTopic
+
+  KDAFlinkAppCloudwatch:
+    Type: AWS::KinesisAnalyticsV2::ApplicationCloudWatchLoggingOption
+    Properties:
+      ApplicationName: !Ref KDAFlinkApplication
+      CloudWatchLoggingOption:
+        LogStreamARN: !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:${KDAFlinkLogGroup}:log-stream:${KDAFlinkLogStream}"
+
+Outputs:
+  EnableKDAApp:
+    Description: Run this command to start the KDA App
+    Value: !Sub "aws kinesisanalyticsv2 start-application --application-name ${AWS::StackName}-kda-app"
+
