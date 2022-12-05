@@ -1,7 +1,7 @@
 #  Real time Sentiment Analysis using Confluent, Amazon Kinesis Data Analytics and Amazon Comprehend
 
   
-This repository accompanies the [Real-time sentiment analysis using Confluent and Amazon Comprehend](https://aws.amazon.com/blogs/machine-learning/build-and-visualize-a-real-time-fraud-prevention-system-using-amazon-fraud-detector/) blog post. It contains **one** [AWS Cloudformation](https://aws.amazon.com/cloudformation/) template. 
+This repository accompanies the [Real-time sentiment analysis using Confluent and Amazon Comprehend](https://aws.amazon.com/blogs) blog post. It contains **one** [AWS Cloudformation](https://aws.amazon.com/cloudformation/) template. 
 
 The template deploys:
 1. PyFlink stream processing job that runs as an [Amazon Kinesis Data Analytics](https://aws.amazon.com/kinesis/data-analytics/) application. The job consumes textual data (e.g twitter feeds) stored in a [Confluent Cloud](https://www.confluent.io/) topic (input.topic), invokes [Amazon Comprehend](https://aws.amazon.com/comprehend/) APIs ([DetectSentiment](https://docs.aws.amazon.com/comprehend/latest/APIReference/API_DetectSentiment.html)) in real time to detect sentiment and writes the output to Confluent Cloud again.
