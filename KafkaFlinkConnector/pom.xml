@@ -29,7 +29,7 @@ under the License.
 
 	<properties>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-		<flink.version>1.13.2</flink.version>
+		<flink.version>1.20.1</flink.version>
 		<kafka.clients.version>2.4.1</kafka.clients.version>
 		<target.java.version>1.11</target.java.version>
 		<jdk.version>11</jdk.version>
@@ -97,7 +97,7 @@ under the License.
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-compiler-plugin</artifactId>
-				<version>3.8.0</version>
+				<version>3.13.0</version>
 				<configuration>
 					<source>${jdk.version}</source>
 					<target>${jdk.version}</target>
@@ -109,7 +109,7 @@ under the License.
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-shade-plugin</artifactId>
-				<version>3.1.1</version>
+				<version>3.6.0</version>
 				<executions>
 					<!-- Run shade goal on package phase -->
 					<execution>
